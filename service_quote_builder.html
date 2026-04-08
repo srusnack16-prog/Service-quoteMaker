@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Service Quote Builder</title>
+<style>
+body {font-family: Arial; background:#f5f5f5; margin:0;}
+.container {display:flex; gap:20px; padding:20px;}
+.form {width:350px; background:white; padding:15px; border-radius:10px;}
+.preview {flex:1; background:white; padding:20px; border-radius:10px;}
+input, textarea {width:100%; margin-bottom:10px; padding:8px;}
+button {padding:10px; cursor:pointer;}
+table {width:100%; border-collapse:collapse;}
+td, th {padding:8px; border-bottom:1px solid #ddd;}
+.total {font-weight:bold; font-size:18px;}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<div class="form">
+<h2>Service Quote</h2>
+
+<label>VIN</label>
+<input id="vin">
+
+<button onclick="decodeVIN()">Auto Fill VIN</button>
+
+<label>Vehicle</label>
+<input id="vehicle">
+
+<label>Customer</label>
+<input id="customer">
+
+<h3>Services</h3>
+
+<div id="services"></div>
+
+<button onclick="addService()">+ Add Service</button>
+
+<h3>Labor Rate ($/hr)</h3>
+<input id="laborRate" value="120">
+
+<h3>Tax %</h3>
+<input id="tax" value="8">
+
+<br><br>
+<button onclick="window.print()">Print Quote</button>
+
+</div>
+
+<div class="preview">
+<h1>Service Quote</h1>
+
+<p><b>Customer:</b> <span id="outCustomer"></span></p>
+<p><b>Vehicle:</b> <span id="outVehicle"></span></p>
+<p><b>VIN:</b> <span id="outVin"></span></p>
+
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Parts</th>
+<th>Labor</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="quoteTable"></tbody>
+</table>
+
+<h2 class="total">Total: $<span id="grandTotal">0</span></h2>
+
+</div>
+
+</div>
+
+<script>
+
+function addService(){
+let div = document.createElement("div");
+div.innerHTML = `
+<input placeholder="Service (Oil Change, Brakes)">
+<input type="number" placeholder="Parts Cost">
+<input type="number" placeholder="Labor Hours">
+`;
+document.getElementById("services").appendChild(div);
+update();
+}
+
+function decodeVIN(){
+let vin = document.getElementById("vin").value;
+if(!vin) return;
+
+fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/${vin}?format=json`)
+.then(r=>r.json())
+.then(data=>{
+let results = data.Results;
+let make = results.find(x=>x.Variable=="Make")?.Value || "";
+let model = results.find(x=>x.Variable=="Model")?.Value || "";
+let year = results.find(x=>x.Variable=="Model Year")?.Value || "";
+
+document.getElementById("vehicle").value = year+" "+make+" "+model;
+update();
+});
+}
+
+function update(){
+let services = document.querySelectorAll("#services div");
+let table = document.getElementById("quoteTable");
+table.innerHTML="";
+
+let laborRate = parseFloat(document.getElementById("laborRate").value)||0;
+let taxRate = parseFloat(document.getElementById("tax").value)||0;
+
+let total = 0;
+
+services.forEach(s=>{
+let inputs = s.querySelectorAll("input");
+let name = inputs[0].value;
+let parts = parseFloat(inputs[1].value)||0;
+let hours = parseFloat(inputs[2].value)||0;
+
+let labor = hours * laborRate;
+let lineTotal = parts + labor;
+total += lineTotal;
+
+let row = `<tr>
+<td>${name}</td>
+<td>$${parts.toFixed(2)}</td>
+<td>$${labor.toFixed(2)}</td>
+<td>$${lineTotal.toFixed(2)}</td>
+</tr>`;
+
+table.innerHTML += row;
+});
+
+let tax = total * (taxRate/100);
+let grand = total + tax;
+
+document.getElementById("grandTotal").innerText = grand.toFixed(2);
+
+document.getElementById("outCustomer").innerText = document.getElementById("customer").value;
+document.getElementById("outVehicle").innerText = document.getElementById("vehicle").value;
+document.getElementById("outVin").innerText = document.getElementById("vin").value;
+
+}
+
+document.addEventListener("input", update);
+
+addService();
+
+</script>
+
+</body>
+</html>
